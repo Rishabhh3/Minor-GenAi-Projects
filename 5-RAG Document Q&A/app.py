@@ -68,6 +68,6 @@ if user_prompt:
     st.write(response)
 
     with st.expander("Document similarity search"):
-        for doc in docs:
+        for i,doc in docs:
             st.write(doc.page_content)
             st.write('---------------------------------')
