@@ -15,3 +15,7 @@ uvicorn
 langserve
 sse_starlette
 sentence_transformers
+torchvision
+faiss-cpu
+arxiv
+wikipedia

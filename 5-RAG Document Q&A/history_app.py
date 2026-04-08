@@ -49,20 +49,21 @@ if uploaded_file:
             file.write(uploaded_file.getvalue())
             file_name = uploaded_file.name
 
-    loader = PyPDFLoader(temppdf)
-    docs = loader.load()
-    documents.extend(docs)
+    loader = PyPDFLoader(temppdf) # initialise the loader
+    docs = loader.load()    # load the document
+    documents.extend(docs)  # add all the pdfs in my document
 
 
     # Split and create embeddings for the documents
+    embeddings = HuggingFaceEmbeddings(model_name = "all-MiniLM-L6-v2")
     text_splitter = RecursiveCharacterTextSplitter(chunk_size = 5000, chunk_overlap = 500)
     splits = text_splitter.split_documents(documents)
-    vector_store = Chroma.from_documents(documents = splits, embedding = HuggingFaceEmbeddings(model_name = "all-MiniLM-L6-v2"))
+    vector_store = Chroma.from_documents(documents = splits, embedding = embeddings) 
     retriever = vector_store.as_retriever()
 
     # context prompt
 
-    contextualize_q_system = (
+    contextualize_q_system = ( # question prompt
         "Given a chat history and the latest user question"
         "which might reference context in the chat history, "
         "formulate a standalone question which can be understood."
@@ -72,13 +73,15 @@ if uploaded_file:
 
     contexualize_q_prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", contextualize_q_system),
+            ("system", contextualize_q_system), # as I talked about I gave it chat history and the question that was asked
             MessagesPlaceholder("chat_history"),
             ("human","{input}"),
         ]
     )
 
     history_aware_retriever = contexualize_q_prompt | llm | StrOutputParser() | retriever
+    # upto this part is so that it looks at chat history and see past context also
+
 
     # Answer question 
     system_prompt = (
@@ -111,7 +114,7 @@ if uploaded_file:
         context = history_aware_retriever
     ) | question_answer_chain
 
-    def get_session_history(session_id) ->BaseChatMessageHistory:
+    def get_session_history(session_id) ->BaseChatMessageHistory: 
         if session_id not in st.session_state.store:
             st.session_state.store[session_id] = ChatMessageHistory()
         return st.session_state.store[session_id]
