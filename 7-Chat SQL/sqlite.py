@@ -11,15 +11,16 @@ table_info="""
 create table STUDENT(NAME VARCHAR(25),CLASS VARCHAR(25),
 SECTION VARCHAR(25),MARKS INT)
 """
+# skeleton of entire table
 
 cursor.execute(table_info)
 
 ## Insert some more records
-cursor.execute('''Insert Into STUDENT values('Krish','Data Science','A',90)''')
+cursor.execute('''Insert Into STUDENT values('Rishabh','Data Science','A',90)''')
 cursor.execute('''Insert Into STUDENT values('John','Data Science','B',100)''')
-cursor.execute('''Insert Into STUDENT values('Mukesh','Data Science','A',86)''')
+cursor.execute('''Insert Into STUDENT values('Watson','Data Science','A',86)''')
 cursor.execute('''Insert Into STUDENT values('Jacob','DEVOPS','A',50)''')
-cursor.execute('''Insert Into STUDENT values('Dipesh','DEVOPS','A',35)''')
+cursor.execute('''Insert Into STUDENT values('David','DEVOPS','A',35)''')
 
 ## Display all the records
 print("The inserted records are")

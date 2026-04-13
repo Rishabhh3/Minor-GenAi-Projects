@@ -20,3 +20,5 @@ faiss-cpu
 arxiv
 wikipedia
 ddgs
+langchain-huggingface
+genanki
