@@ -22,3 +22,5 @@ wikipedia
 ddgs
 langchain-huggingface
 genanki
+mysql-connector-python
+SQLAlchemy

@@ -1,5 +1,5 @@
 import streamlit as st
-import pathlib as Path
+from pathlib import Path
 # in streamlit we have an agent that help us create sql agent itself
 from langchain_classic.agents import create_sql_agent
 from langchain_classic.sql_database import SQLDatabase
@@ -69,3 +69,33 @@ if db_url == MYSQL:
     db = configure_db(db_url,mysql_host,mysql_user,mysql_password,mysql_db)
 else:
     db = configure_db(db_url)
+
+
+# TOOLKIT
+toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+
+agent = create_sql_agent(
+    llm=llm,
+    toolkit=toolkit,
+    verbose=True,
+    agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    handle_parsing_error = True
+)
+
+if "messages" not in st.session_state or st.sidebar.button("Clear message history"):
+    st.session_state["messages"] = [{"role":"assistant","content":"How Can I help you?"}]
+
+for msg in st.session_state.messages:
+    st.chat_message(msg["role"]).write(["content"])
+
+user_query = st.chat_input(placeholder="Ask anything about database")
+
+if user_query:
+    st.session_state.messages.append({"role":"user","content":user_query})
+    st.chat_message("user").write(user_query)
+
+    with st.chat_message("assistant"):
+        streamlit_callback = StreamlitCallbackHandler(st.container())
+        response = agent.run(user_query,callbacks=[streamlit_callback])
+        st.session_state.messages.append({"role":"assistant","content":"response"})
+        st.write(response)
