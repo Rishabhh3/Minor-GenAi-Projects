@@ -24,3 +24,7 @@ langchain-huggingface
 genanki
 mysql-connector-python
 SQLAlchemy
+validators==0.28.1
+youtube_transcript_api
+unstructured
+pytube
