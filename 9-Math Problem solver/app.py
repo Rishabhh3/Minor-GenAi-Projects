@@ -6,9 +6,7 @@ from langchain_community.utilities import WikipediaAPIWrapper
 from langchain_classic.agents.agent_types import AgentType 
 from langchain_classic.agents import initialize_agent 
 from langchain_classic.tools import Tool
-from dotenv import load_dotenv 
 from langchain_classic.callbacks import StreamlitCallbackHandler
-from langchain_core.output_parsers import StrOutputParser
 
 # Streamlit app
 st.set_page_config(page_title="Text to math problem solver and data search assistant")
@@ -31,12 +29,13 @@ wikipedia_tool = Tool(
 )
 
 # Initialise the math tool
-math_chain = llm | StrOutputParser()
+# to wrap a function or callable, so can be used by agent as tool for specific tasks.
 calculator = Tool(
     name = "calculator",
-    func = lambda x:math_chain.invoke(x),
+    func = lambda x:llm.invoke(x), # lambda so to make it runnable
     description = "A tool for math related questions. Only input mathematical expression need to be provided"
 )
+# the agent see the description and decides whether to use this tool or not
 
 prompt = """
 "You are an agent used for solving user mathematical question" 
@@ -46,7 +45,6 @@ prompt = """
 prompt_template = PromptTemplate(
     input_variables=['question'],
     template=prompt
-
 )
 
 # Combine all tools into chain
@@ -54,9 +52,16 @@ llm_chain =  prompt_template | llm
 
 reasoning_tool = Tool(
     name = "Reasoning tool",
-    func = lambda x : llm_chain.invoke(x),
+    func = llm_chain.invoke(x),
     description = "Tool for answering logic-based and reasoning question"
 )
+
+# Depending on use case I made 3 tools 
+# calculator just feeds raw data to llm, like 2+2 no prompt required
+# but reasoning tool adds prompt to it, now which tool to use
+# for this we have description, I gave the list of tools to llm now based on
+# description of tool , my llm(agent) will decide which tool to use and depending on
+# the appropriate chain or tool will be used
 
 # Initiliase the agents
 assistant_agents  = initialize_agent(
@@ -71,11 +76,15 @@ if "messages" not in st.session_state:
     st.session_state["messages"] = [
         {"role": "assistant", "content" : "Hi I am a Math Chatbot who can try to answer math questions"}
     ]
+
+# This loop displays the chat history in your Streamlit app.
+# app shows a chat-like interface, displaying all previous messages in order, 
+# with the correct sender (user or assistant) for each message.
 for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
-# Interaction
 
+# Interaction
 question = st.text_area("Enter your question")
 
 if st.button("Find my answer"):
@@ -85,6 +94,8 @@ if st.button("Find my answer"):
             st.chat_message("user").write()
 
             st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
+            # receive update during execution, sends intm. outputs like show thinking
+            # bridge between internal process and app's UI
             response = assistant_agents.invoke( question, callbacks=[st_cb])
 
             st.session_state.messages.append({"role":'assistant', 'content' : response})
