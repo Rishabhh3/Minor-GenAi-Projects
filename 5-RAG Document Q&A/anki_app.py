@@ -173,17 +173,22 @@ Additional retrieved context:
 ---
 """
 	else:
-		prompt = f"""You are an expert study coach. Generate high-quality flashcards from the source.
+		prompt = f"""You are an expert study coach. Generate exam-style MCQ flashcards from the source.
 
 Rules:
 1) Return ONLY a valid JSON array.
-2) Each item must contain keys: question, answer, extra, tags.
-3) Keep each question precise and unambiguous.
-4) Keep each answer concise but complete (1-4 sentences).
-5) Avoid duplicates or near-duplicates.
-6) Prefer conceptual understanding over trivia.
-7) If the content has formulas, include at least one formula-based card when possible.
-8) Keep output exam-ready and high-yield.
+2) Each item must contain keys:
+	- question (string)
+	- options (array of exactly 4 strings)
+	- correct_option (one of "A", "B", "C", "D")
+	- explanation (string, 1-3 lines)
+	- extra (string)
+	- tags (string)
+3) Question must be clear and unambiguous.
+4) Exactly one best correct option.
+5) Keep options plausible and non-overlapping.
+6) Avoid duplicates or near-duplicates.
+7) Keep output exam-ready and high-yield.
 
 Target count: {cards_per_chunk}
 Source page: {source_page}
@@ -230,16 +235,43 @@ Additional retrieved context:
 			)
 		else:
 			question = normalize_space(str(rec.get("question", "")))
-			answer = normalize_space(str(rec.get("answer", "")))
-			if len(question) < 12 or len(answer) < 8:
+			options = rec.get("options", [])
+			if isinstance(options, str):
+				options = [
+					normalize_space(opt)
+					for opt in re.split(r"\n|;", options)
+					if normalize_space(opt)
+				]
+			elif isinstance(options, list):
+				options = [normalize_space(str(opt)) for opt in options if normalize_space(str(opt))]
+			else:
+				options = []
+
+			correct_option = normalize_space(str(rec.get("correct_option", ""))).upper()
+			explanation = normalize_space(str(rec.get("explanation", "")))
+
+			if len(question) < 12 or len(options) != 4 or correct_option not in {"A", "B", "C", "D"}:
 				continue
-			if question.lower() == answer.lower():
+			if len(set(opt.lower() for opt in options)) < 4:
 				continue
+
+			question_with_options = (
+				f"{question}\n\n"
+				f"A) {options[0]}\n"
+				f"B) {options[1]}\n"
+				f"C) {options[2]}\n"
+				f"D) {options[3]}"
+			)
+
+			answer = (
+				f"Correct: {correct_option}\n"
+				f"Explanation: {explanation}"
+			)
 			cards.append(
 				{
 					"card_type": card_type,
 					"text": "",
-					"question": question,
+					"question": question_with_options,
 					"answer": answer,
 					"extra": extra,
 					"tags": tags,
@@ -522,6 +554,15 @@ if "vectorstore" in st.session_state:
 	with gen_col4:
 		note_type = st.selectbox("Note type", ["Basic", "Basic + Reverse", "Cloze"], index=0)
 
+	auto_scale = st.checkbox("Auto-scale chunks for large PDFs", value=True)
+	desired_min_cards = st.number_input(
+		"Desired minimum cards",
+		min_value=20,
+		max_value=800,
+		value=120,
+		step=10,
+	)
+
 	if note_type == "Basic":
 		card_type = "Basic Q/A"
 	elif note_type == "Basic + Reverse":
@@ -541,7 +582,25 @@ if "vectorstore" in st.session_state:
 				)
 
 				vectorstore = st.session_state["vectorstore"]
-				selected_chunks = choose_representative_chunks(vectorstore, max_chunks=max_chunks)
+				total_chunks = len(st.session_state.get("chunks", []))
+				effective_cards_per_chunk = max(1, int(cards_per_chunk))
+
+				if auto_scale:
+					needed_chunks = (int(desired_min_cards) + effective_cards_per_chunk - 1) // effective_cards_per_chunk
+					effective_max_chunks = max(int(max_chunks), needed_chunks)
+				else:
+					effective_max_chunks = int(max_chunks)
+
+				effective_max_chunks = min(max(1, total_chunks), effective_max_chunks)
+				selected_chunks = choose_representative_chunks(vectorstore, max_chunks=effective_max_chunks)
+
+				st.info(
+					f"Generation plan: {len(selected_chunks)} chunks x {effective_cards_per_chunk} cards/chunk (pre-dedup target: {len(selected_chunks) * effective_cards_per_chunk})."
+				)
+				if auto_scale and total_chunks < ((int(desired_min_cards) + effective_cards_per_chunk - 1) // effective_cards_per_chunk):
+					st.warning(
+						"This PDF has limited chunk coverage for the requested minimum. Increase cards per chunk or reduce chunk size for more total chunks."
+					)
 
 				all_cards = []
 				progress = st.progress(0)
