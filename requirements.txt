@@ -28,3 +28,6 @@ validators==0.28.1
 youtube_transcript_api
 unstructured
 pytube
+pinecone
+pinecone-text
+pinecone-notebooks
